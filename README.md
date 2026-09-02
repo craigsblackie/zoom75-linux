@@ -270,7 +270,10 @@ cheap checks all run before the OTA service is contacted at all:
 ## Built-in system screens (CPU / GPU / fan / network / weather)
 
 These screens are fed over **USB raw HID, not BLE** — which is why they read 0
-with only the Bluetooth tooling running. The vendor's Windows app (MeletrixID,
+with only the Bluetooth tooling running. This is not a limitation of the
+tooling: the two transports carry different command spaces, and sending the BLE
+weather command to generation-1 hardware is acked and then ignored. See "The two
+command spaces do not overlap" in `PROTOCOL.md`. The vendor's Windows app (MeletrixID,
 which wraps LibreHardwareMonitor) pushes 32-byte reports to the keyboard's
 vendor HID interface. `zoom75/hid.py` is a port of that protocol.
 

@@ -236,6 +236,30 @@ frame and no visible effect.
 | `0x0702` | generic ack (`01` + request opcode) | **verified** |
 | `0x0803`/`0x0805`/`0x0903`/`0x0907` | dial upload and restore | **verified** |
 
+### The two command spaces do not overlap
+
+The module answers on two transports that carry **different, non-overlapping
+protocols**:
+
+| | framing | carries |
+|---|---|---|
+| BLE | `88 00 00 <len32> <xor> <opcode16> …` | dial images, clock, notes, notifications — the phone app's feature set |
+| USB raw HID | `1C … <crc16> A5 <field8> <len16> …` | CPU/GPU temperature, fan RPM, network, weather — the built-in live screens |
+
+There is no known way to reach the `0xA5` sensor space from BLE. Tested
+directly: sending the BLE weather command `0x0407` to generation-1 hardware is
+acknowledged and then **ignored** — the weather screen keeps reading 0. That
+command is only wired up for the 2nd-generation module in the vendor app, and
+the vendor's own architecture corroborates the split: they wrote BLE weather for
+the 2nd-gen module but ship a *Windows USB* application to feed the same screens
+on generation 1. Had BLE worked there, they would have used it.
+
+**An acknowledgement proves nothing about support.** This firmware returns the
+generic `0x0702` ack echoing the request opcode for commands it does not
+implement — confirmed for notifications (`0x0501`), usage stats (`0x0023`),
+alarms (`0x0025`) and weather (`0x0407`). Only a visible change on the panel, or
+a data frame in reply, demonstrates that a command did anything.
+
 ### Undocumented commands
 
 Six commands exist in the vendor SDK and are **never called from anywhere in
