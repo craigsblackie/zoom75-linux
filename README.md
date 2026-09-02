@@ -1,4 +1,6 @@
-# zoom75-screen
+# zoom75-linux
+
+[![tests](https://github.com/craigsblackie/zoom75-linux/actions/workflows/tests.yml/badge.svg)](https://github.com/craigsblackie/zoom75-linux/actions/workflows/tests.yml)
 
 Drive the screen on a Meletrix / Wuque Studio **Zoom75** keyboard from Linux —
 custom images and animations, a system dashboard, the built-in CPU / GPU / fan /
