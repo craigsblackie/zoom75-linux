@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Vendor firmware images are not redistributed here -- `z75 fw download`
+# fetches them from Meletrix's own server.
+firmware/*.bin

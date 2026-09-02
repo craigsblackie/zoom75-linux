@@ -1,0 +1,31 @@
+# Zoom75 screen daemon configuration.
+# Root-owned: editing what the screen shows requires sudo.
+#   sudo systemctl restart zoom75-screen   after changing this file.
+
+[hid]
+# USB raw HID -- feeds the built-in CPU / GPU / fan / network screens.
+enabled = true
+interval = 2.0            # seconds between sensor pushes
+clock_interval = 300.0    # seconds between clock pushes
+cpu = true                # CPU temperature (not load)
+gpu = true                # GPU temperature
+fan = true                # highest fan/pump RPM hwmon exposes
+network = true            # (rx + tx) / 2 in bytes per second
+clock = true
+
+[weather]
+# Open-Meteo; no API key. Off by default because it makes outbound requests.
+enabled = false
+latitude = 51.5072
+longitude = -0.1276
+interval = 1800.0
+
+[network]
+interface = ""            # blank = whichever holds the default route
+
+[ble]
+# Off by default: an image upload takes ~35s and holds the BLE link, which
+# blocks the z75 CLI for that whole time.
+enabled = false
+dashboard_interval = 300.0
+clock_interval = 21600.0

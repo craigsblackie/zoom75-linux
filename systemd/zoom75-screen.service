@@ -1,0 +1,60 @@
+[Unit]
+Description=Zoom75 keyboard screen daemon
+Documentation=file:/opt/zoom75-screen/README.md
+After=network-online.target bluetooth.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/opt/zoom75-screen/.venv/bin/python -m zoom75.service
+WorkingDirectory=/opt/zoom75-screen
+Environment=PYTHONPATH=/opt/zoom75-screen
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=10
+
+# --- sandbox -------------------------------------------------------------
+# Runs as root only to open /dev/hidraw*, which stays crw------- root root so
+# that no unprivileged process can read the keyboard's input interfaces. Every
+# privilege beyond that is dropped.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+UMask=0077
+
+# Only the hidraw character devices, nothing else under /dev.
+DevicePolicy=closed
+DeviceAllow=char-hidraw rw
+
+# D-Bus (BlueZ) is AF_UNIX; the weather lookup needs IP. Nothing else.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete @mount @swap @reboot @module
+SystemCallArchitectures=native
+
+# Read-only everywhere; the daemon writes nothing.
+ReadOnlyPaths=/opt/zoom75-screen /etc/zoom75
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+# Zoom75 vendor raw-HID interface, used to feed the keyboard's built-in
+# CPU / GPU / fan / network / weather screens.
+#
+# bInterfaceNumber=="01" is deliberate and load-bearing. The keyboard exposes
+# three hidraw nodes; interface 00 is the boot keyboard and carries your actual
+# keystrokes, interface 02 the consumer/media collection. Matching only
+# interface 01 (usage page 0xFF60) keeps this rule from handing every process
+# running as your user the ability to read what you type.
+#
+# Install:
+#   sudo install -m 0644 udev/99-zoom75.rules /etc/udev/rules.d/99-zoom75.rules
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger --subsystem-match=hidraw
+#
+# Remove:
+#   sudo rm /etc/udev/rules.d/99-zoom75.rules && sudo udevadm control --reload-rules
+#
+# Verify afterwards that ONLY the vendor node opened up:
+#   ls -l /dev/hidraw*   # the keyboard interfaces must stay crw------- root root
+
+KERNEL=="hidraw*", ATTRS{idVendor}=="1ea7", ATTRS{idProduct}=="ced3", ATTRS{bInterfaceNumber}=="01", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="1ea7", ATTRS{idProduct}=="cd68", ATTRS{bInterfaceNumber}=="01", MODE="0660", TAG+="uaccess"
