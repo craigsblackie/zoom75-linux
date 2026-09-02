@@ -2,6 +2,7 @@
 import struct
 from zoom75 import protocol as p
 from zoom75 import image as im
+from zoom75 import hid as _hid
 
 fails = []
 def eq(name, got, want):
@@ -213,6 +214,62 @@ eq("T clock rejects 0x88 frames", p.parse_t_clock(b"\x88\x00\x00"), None)
 eq("T clock rejects short", p.parse_t_clock(bytes.fromhex("540a07ea09")), None)
 eq("T clock rejects bad date", p.parse_t_clock(bytes.fromhex("540affff6363636363")), None)
 eq("reset sub-command is flagged", p.T_RESET_DANGEROUS, 0x01)
+
+# --- device profiles -------------------------------------------------------
+from zoom75 import devices as _dev
+
+eq("zoom75 geometry", (_dev.ZOOM75.width, _dev.ZOOM75.height), (320, 172))
+eq("zoom75 frame bytes", _dev.ZOOM75.frame_bytes, 110080)
+eq("second-gen geometry", (_dev.SECOND_GEN.width, _dev.SECOND_GEN.height), (390, 390))
+eq("zoom75 is the default", _dev.DEFAULT.name, "zoom75")
+eq("only zoom75 claims verified", [d.name for d in _dev.ALL if d.verified], ["zoom75"])
+eq("usb lookup finds zoom75", _dev.by_usb(0x1EA7, 0xCED3).name, "zoom75")
+eq("usb lookup finds tiga", _dev.by_usb(0x1EA7, 0xCEDD).name, "tiga")
+eq("usb lookup misses unknown", _dev.by_usb(0x1234, 0x5678), None)
+eq("bundled models", sorted(d.name for d in _dev.ALL if d.hid_style == "bundled"),
+   ["dyna", "hetix", "tiga"])
+try:
+    _dev.by_name("nope"); print("FAIL  unknown device rejected"); fails.append("unknown device")
+except ValueError:
+    print("PASS  unknown device rejected")
+
+# geometry actually drives the encoders
+from PIL import Image as _Im
+for _d in (_dev.ZOOM75, _dev.SECOND_GEN):
+    _img = _Im.new("RGB", (700, 500), (1, 2, 3))
+    eq(f"{_d.name} fit size", im.fit(_img, "cover", _d).size, (_d.width, _d.height))
+    eq(f"{_d.name} rgb565 length", len(im.to_rgb565(im.fit(_img, "cover", _d), _d)), _d.frame_bytes)
+_a = im.build_animation([bytes(_dev.SECOND_GEN.frame_bytes)] * 2, device=_dev.SECOND_GEN)
+eq("second-gen animation geometry", struct.unpack(">HH", _a[368 + 10:368 + 14]), (390, 390))
+
+# --- bundled raw-HID reports (Tiga / Dyna / Hetix) -------------------------
+_b = _hid.report_bundle(55, 40, 35, 1200, 4096)
+eq("bundle field", _b[9], 0xFF)
+eq("bundle outer", (_b[1], _b[5]), (2, 16))
+eq("bundle data len", _b[10:12].hex(), "000b")
+eq("bundle cpu/gpu/ssd", (_b[14], _b[16], _b[18]), (55, 40, 35))
+eq("bundle fan wraps to one byte", _b[20], 1200 & 0xFF)
+eq("bundle net BE", _b[21:23].hex(), "1000")
+eq("bundle literal checksum", _b[23], 0xFF)
+eq("bundle crc", _hid.crc16_ccitt(_b[:6] + b"\x00\x00" + _b[8:]), (_b[7] << 8) | _b[6])
+
+_bw = _hid.report_bundle_weather(6, 17, 21, -3)
+eq("bundle weather field", _bw[9], 0xFE)
+eq("bundle weather outer", (_bw[1], _bw[5]), (2, 13))
+eq("bundle weather temps", (_bw[14:16].hex(), _bw[16:18].hex(), _bw[18:20].hex()),
+   ("0011", "0015", "8003"))
+
+# --- extras ----------------------------------------------------------------
+from zoom75 import extras as _ex
+_track = {"player": "x", "status": "Playing", "title": "T" * 60,
+          "artist": "A" * 40, "album": "B" * 40, "art": None}
+eq("now-playing renders", _ex.render_now_playing(_track).size, (320, 172))
+eq("now-playing on second-gen", _ex.render_now_playing(_track, _dev.SECOND_GEN).size, (390, 390))
+eq("now-playing frame length", len(_ex.now_playing_frame(_track)), 110080)
+eq("art url must be local", _ex._local_art("https://example.com/a.png"), None)
+eq("empty art url", _ex._local_art(""), None)
+eq("first of a list", _ex._first(["a", "b"]), "a")
+eq("first of empty", _ex._first([]), "")
 
 print()
 print(f"{'ALL PASS' if not fails else str(len(fails)) + ' FAILURES: ' + ', '.join(fails)}")

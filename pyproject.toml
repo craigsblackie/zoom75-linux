@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zoom75-linux"
+version = "1.0.0"
+description = "Linux tooling for Meletrix / Wuque Studio keyboard screen modules"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Craig S. Blackie" }]
+keywords = ["keyboard", "zoom75", "meletrix", "wuque", "ble", "hid", "lcd"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Hardware",
+]
+dependencies = ["bleak>=0.22", "pillow>=10"]
+
+[project.optional-dependencies]
+# Only needed to re-run the firmware analysis in PROTOCOL.md.
+research = ["capstone>=5"]
+
+[project.urls]
+Homepage = "https://github.com/craigsblackie/zoom75-linux"
+Protocol = "https://github.com/craigsblackie/zoom75-linux/blob/main/PROTOCOL.md"
+
+[project.scripts]
+z75 = "zoom75.cli:main"
+
+[tool.setuptools]
+packages = ["zoom75"]

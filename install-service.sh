@@ -51,7 +51,7 @@ echo "==> source: $SRC"
 [[ -d "$SRC/zoom75" ]] || { echo "zoom75/ package not found next to this script" >&2; exit 1; }
 
 # A root-run daemon must not load code from a directory others can write to.
-if [[ -n "$(find "$SRC/zoom75" -perm -o+w -print -quit)" ]]; then
+if [[ -n "$(find "$SRC/zoom75" "$SRC/pyproject.toml" -perm -o+w -print -quit)" ]]; then
     echo "Refusing: $SRC/zoom75 contains world-writable files." >&2
     exit 1
 fi
@@ -63,18 +63,15 @@ if [[ -e "$OLD_UDEV" ]]; then
     udevadm trigger --subsystem-match=hidraw || true
 fi
 
-echo "==> installing code to $PREFIX"
+echo "==> installing to $PREFIX (root-owned virtualenv)"
 rm -rf "$PREFIX"
-install -d -o root -g root -m 0755 "$PREFIX" "$PREFIX/zoom75"
-install -o root -g root -m 0644 "$SRC"/zoom75/*.py "$PREFIX/zoom75/"
+install -d -o root -g root -m 0755 "$PREFIX"
+/usr/bin/python3 -m venv "$PREFIX/.venv"
+"$PREFIX/.venv/bin/pip" install -q --disable-pip-version-check --upgrade pip
+"$PREFIX/.venv/bin/pip" install -q --disable-pip-version-check "$SRC"
 for doc in README.md PROTOCOL.md; do
     [[ -f "$SRC/$doc" ]] && install -o root -g root -m 0644 "$SRC/$doc" "$PREFIX/"
 done
-
-echo "==> building the virtualenv (root-owned)"
-/usr/bin/python3 -m venv "$PREFIX/.venv"
-"$PREFIX/.venv/bin/pip" install -q --disable-pip-version-check --upgrade pip
-"$PREFIX/.venv/bin/pip" install -q --disable-pip-version-check bleak pillow
 chown -R root:root "$PREFIX"
 find "$PREFIX" -type d -exec chmod 755 {} +
 find "$PREFIX" -type f -not -path "*/.venv/bin/*" -exec chmod 644 {} +

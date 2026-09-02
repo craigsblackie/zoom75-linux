@@ -1,3 +1,26 @@
+Metadata-Version: 2.4
+Name: zoom75-linux
+Version: 1.0.0
+Summary: Linux tooling for Meletrix / Wuque Studio keyboard screen modules
+Author: Craig S. Blackie
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/craigsblackie/zoom75-linux
+Project-URL: Protocol, https://github.com/craigsblackie/zoom75-linux/blob/main/PROTOCOL.md
+Keywords: keyboard,zoom75,meletrix,wuque,ble,hid,lcd
+Classifier: Environment :: Console
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: System :: Hardware
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: bleak>=0.22
+Requires-Dist: pillow>=10
+Provides-Extra: research
+Requires-Dist: capstone>=5; extra == "research"
+Dynamic: license-file
+
 # zoom75-screen
 
 Drive the screen on a Meletrix / Wuque Studio **Zoom75** keyboard from Linux —
@@ -15,69 +38,28 @@ of the behaviour here:
 | **BLE** | The screen module is its own peripheral, advertising as `Zoom75 Screen` even while the keyboard is on USB or 2.4 GHz. Carries custom images, animations, the module clock and notes. |
 | **USB raw HID** | Feeds the *built-in* CPU / GPU / fan / network / weather screens. These read 0 unless something is pushing to them — that is what the daemon is for. |
 
+```
+./z75 scan                      # find it
+./z75 info                      # status, battery, firmware
+./z75 image photo.png           # upload a still
+./z75 gif loop.gif --speed 7    # upload an animation
+./z75 text "build passing"      # render text and upload
+./z75 time                      # set the module's own clock
+./z75 restore                   # back to the built-in dial
+./z75 note "Deploy" "v2.1 green"  # store a note (viewable on the device)
+./z75 notify "title" "body"     # push a notification (acked; see caveats)
+./z75 usage / alarms / find     # queries this hardware acks but does not answer
+./z75 backlight <level> <timeout>
+./z75 danger poweroff|testmode|unbind   # undocumented, gated, never fired here
+```
+
 ## Install
 
 ```
-pip install git+https://github.com/craigsblackie/zoom75-linux
+uv venv --python 3.13 .venv
+uv pip install --python .venv/bin/python bleak pillow
+./z75 --help
 ```
-
-or from a clone: `pip install .` — then the `z75` command is on your path.
-Python 3.11+, Linux, BlueZ. For the built-in system screens see
-"Running it as a service" below.
-
-```
-z75 scan                          # find it
-z75 info                          # status, battery, firmware
-z75 image photo.png               # upload a still
-z75 gif loop.gif --speed 7        # upload an animation
-z75 text "build passing"          # render text and upload
-z75 stats --watch                 # live CPU/GPU/RAM/network dashboard
-z75 slideshow ~/Pictures --loop   # cycle a folder of images
-z75 nowplaying --watch            # current track with album art (MPRIS)
-z75 note "Deploy" "v2.1 green"    # store a note (viewable on the device)
-z75 time                          # set the module's own clock
-z75 time --read                   # read it back
-z75 hid feed --watch              # drive the built-in CPU/GPU/fan screens (USB)
-z75 fw check                      # firmware version and updates
-z75 restore                       # back to the built-in dial
-z75 devices                       # supported models
-```
-
-## Supported models
-
-Only the Zoom75 has been verified against real hardware. The others are
-transcribed from the vendor clients — geometry, USB ids and report style are
-implemented, but nobody has run them. `z75 devices` prints this table, and
-`-D/--device` selects one.
-
-| model | panel | raw-HID style | status |
-|---|---|---|---|
-| `zoom75` | 320x172 | one report per sensor | **verified** |
-| `second-gen` | 390x390 | one report per sensor | untested |
-| `tiga` | 320x172 | bundled | untested |
-| `dyna` | 320x172 | bundled | untested |
-| `hetix` | 320x172 | bundled | untested |
-
-If you own one of the untested boards, `z75 -D <model> info` and an issue
-saying what happened would be genuinely useful.
-
-## Extras
-
-Things the vendor apps do not do. The panel only ever receives pixels, so
-anything renderable works.
-
-```
-z75 nowplaying --watch                 # album art, title, artist, album
-z75 nowplaying --dry-run --save np.png # preview without touching the keyboard
-z75 slideshow ~/Pictures --shuffle --loop --interval 120
-```
-
-Now-playing reads MPRIS over the session bus via dbus-fast, which bleak already
-depends on, so it adds no requirement. Remote album art is not fetched — only
-`file://` URLs are used, since the panel is offline anyway. It re-uploads only
-when the track actually changes, which matters when each upload costs ~35s.
-
-Both are session-user features; the root service does not run them.
 
 ## Panel
 
@@ -443,18 +425,12 @@ full opcode table with per-command status. Summary for generation-1 hardware:
 - `./z75 restore` returns the screen to its built-in dial if an upload leaves it
   showing something you don't want.
 
+## Status
 
-## Development
+Both the still and animated paths are confirmed working on real hardware. See
+`tests.py` for the encoder checks (run `.venv/bin/python tests.py`), which
+verify the frame builders against byte strings lifted from the vendor app.
 
-```
-pip install -e .
-python tests.py          # protocol, image, HID, device and extras checks
-python tests_ota.py      # firmware / OTA checks
-```
-
-Both suites are plain scripts with no test-runner dependency, and CI runs them
-on Python 3.11-3.13. The OTA suite skips the checks that need a firmware image,
-since none is redistributed here — `z75 fw download` fetches one.
 
 ## Credits and status
 
@@ -468,14 +444,9 @@ originals. No vendor code or firmware is redistributed in this repository;
 `z75 fw download` fetches images from Meletrix's own server.
 
 Developed against a generation-1 Zoom75 (product `c003`, firmware V0.1.79).
-The 2nd-generation 390x390 module, Tiga, Dyna and Hetix are **implemented but
-untested** — see "Supported models". Several commands are marked in
-`PROTOCOL.md` as belonging to those boards.
-
-Known to be implemented but inert on generation-1 hardware: notifications
-(`0x0501`), usage stats (`0x0023`), alarms (`0x0025`) and BLE weather
-(`0x0407`). The device acknowledges each and does nothing. `PROTOCOL.md` has
-the per-command status table.
+Behaviour on the 2nd-generation 390x390 module, Tiga, Dyna or Hetix is
+untested — several commands are marked in `PROTOCOL.md` as belonging to those
+models.
 
 **Firmware flashing is implemented but has never been executed.** Read the
 warnings in `PROTOCOL.md` before using `z75 fw flash`.

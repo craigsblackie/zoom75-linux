@@ -1,0 +1,32 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: Protocol and encoder tests
+        run: python tests.py
+      - name: Firmware / OTA tests
+        # The firmware image is not redistributed, so the checks that need it
+        # skip themselves. Everything else still runs.
+        run: python tests_ota.py
+      - name: CLI smoke test
+        run: |
+          z75 --help
+          z75 devices
+          z75 fw --help

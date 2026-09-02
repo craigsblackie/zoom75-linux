@@ -1,0 +1,5 @@
+bleak>=0.22
+pillow>=10
+
+[research]
+capstone>=5

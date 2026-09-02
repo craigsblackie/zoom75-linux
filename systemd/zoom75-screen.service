@@ -8,7 +8,6 @@ Wants=network-online.target
 Type=exec
 ExecStart=/opt/zoom75-screen/.venv/bin/python -m zoom75.service
 WorkingDirectory=/opt/zoom75-screen
-Environment=PYTHONPATH=/opt/zoom75-screen
 Environment=PYTHONDONTWRITEBYTECODE=1
 Restart=always
 RestartSec=10
