@@ -1,2 +1,0 @@
-[console_scripts]
-z75 = zoom75.cli:main

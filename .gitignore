@@ -5,3 +5,8 @@ __pycache__/
 # Vendor firmware images are not redistributed here -- `z75 fw download`
 # fetches them from Meletrix's own server.
 firmware/*.bin
+
+# Build artefacts
+build/
+dist/
+*.egg-info/

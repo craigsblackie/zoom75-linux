@@ -26,7 +26,9 @@ eq("dial begin", p.cmd_dial_begin().hex(),
 # KeyBoardConstant.getDialByte, type != 2 (still image)
 size = p.FRAME_BYTES
 body = bytes([1, 0, 11]) + struct.pack(">I", 65533) + struct.pack(">I", size) + b"\xff\xff\xff"
-want = "88" + "0000" + struct.pack(">I", 16).hex() + f"{p.xor(b'\x09\x03'+body):02x}" + "0903" + body.hex()
+_op = bytes([0x09, 0x03])
+_xor = "%02x" % p.xor(_op + body)
+want = "88" + "0000" + struct.pack(">I", 16).hex() + _xor + "0903" + body.hex()
 eq("dial info (still)", p.cmd_dial_info(size, False).hex(), want)
 
 # CustomDialActivity.keyValue -> the 25-byte bulk prefix
@@ -38,7 +40,7 @@ eq("flash header length", len(p.flash_header(size)), 25)
 # BleConstant.syncTime()
 t = p.cmd_sync_time(2026, 9, 2, 13, 45, 30)
 eq("sync time", t.hex(), "88" + "0000" + "00000009"
-   + f"{p.xor(bytes([4,1,0x07,0xea,9,2,13,45,30])):02x}"
+   + ("%02x" % p.xor(bytes([4, 1, 0x07, 0xEA, 9, 2, 13, 45, 30])))
    + "0401" + "07ea" + "0902" + "0d" + "2d" + "1e")
 
 # --- bulk splitter round-trips and matches the app's chunk geometry --------
