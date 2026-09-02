@@ -184,6 +184,23 @@ eq("wmo rain -> icon 6", _hid.wmo_to_icon(61), 6)
 eq("wmo clear night -> icon 4", _hid.wmo_to_icon(0, is_night=True), 4)
 eq("wmo snow -> icon 7", _hid.wmo_to_icon(73), 7)
 
+# --- dashboard header: address, with the interface name as fallback --------
+from zoom75 import dashboard as _dash
+from zoom75.stats import Metric as _Metric, Sample as _Sample, iface_ip as _iface_ip
+import time as _time
+
+def _mk(ip, iface):
+    return _Sample(host="host", when=_time.localtime(),
+                   cpu=_Metric("CPU", 10.0, "10%", "50"), mem=_Metric("MEM", 20.0, "2G", "2/8G"),
+                   gpu=None, net_iface=iface, net_ip=ip, rx_bps=1.0, tx_bps=2.0)
+
+eq("renders with an address", _dash.render(_mk("192.0.2.10", "eth0")).size, (320, 172))
+eq("renders without one", _dash.render(_mk(None, "eth0")).size, (320, 172))
+eq("renders with neither", _dash.render(_mk(None, "")).size, (320, 172))
+eq("loopback address resolves", _iface_ip("lo"), "127.0.0.1")
+eq("unknown interface is None", _iface_ip("definitely-not-a-nic"), None)
+eq("empty interface is None", _iface_ip(""), None)
+
 print()
 print(f"{'ALL PASS' if not fails else str(len(fails)) + ' FAILURES: ' + ', '.join(fails)}")
 raise SystemExit(1 if fails else 0)

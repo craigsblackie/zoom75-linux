@@ -6,8 +6,10 @@ or no default route still produces a usable sample rather than raising.
 
 from __future__ import annotations
 
+import fcntl
 import shutil
 import socket
+import struct
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -30,6 +32,7 @@ class Sample:
     mem: Metric
     gpu: Metric | None
     net_iface: str = ""
+    net_ip: str | None = None
     rx_bps: float = 0.0
     tx_bps: float = 0.0
     fan: tuple[int, str] | None = None
@@ -139,6 +142,29 @@ def _default_iface() -> str | None:
     return None
 
 
+_SIOCGIFADDR = 0x8915
+
+
+def iface_ip(iface: str) -> str | None:
+    """IPv4 address of a specific interface.
+
+    Uses SIOCGIFADDR rather than the usual connect-to-8.8.8.8 trick: that
+    guesses via the routing table and needs a default route, while this asks
+    about the exact interface whose throughput is on screen, and touches the
+    network not at all.
+    """
+    if not iface:
+        return None
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        packed = struct.pack("256s", iface[:15].encode())
+        return socket.inet_ntoa(fcntl.ioctl(sock.fileno(), _SIOCGIFADDR, packed)[20:24])
+    except OSError:
+        return None
+    finally:
+        sock.close()
+
+
 def _net_counters(iface: str) -> tuple[int, int]:
     base = f"/sys/class/net/{iface}/statistics"
     return int(_read(f"{base}/rx_bytes") or 0), int(_read(f"{base}/tx_bytes") or 0)
@@ -195,6 +221,7 @@ class Sampler:
             mem=_mem(),
             gpu=_gpu(),
             net_iface=self.iface,
+            net_ip=iface_ip(self.iface),
             rx_bps=rx_bps,
             tx_bps=tx_bps,
         )

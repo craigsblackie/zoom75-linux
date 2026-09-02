@@ -91,8 +91,11 @@ def render(sample: Sample) -> Image.Image:
     # see `z75 time` and `z75 mode 1`.
     d.rectangle([0, 0, SCREEN_WIDTH - 1, 25], fill=HEADER_BG)
     d.text((10, 4), sample.host[:26], font=_font(15), fill=TEXT)
-    if sample.net_iface:
-        _right(d, (SCREEN_WIDTH - 8, 6), sample.net_iface, _font(13, bold=False), DIM)
+    # The address is more use at a glance than the interface name; fall back to
+    # the name when the link has no IPv4 address.
+    right = sample.net_ip or sample.net_iface
+    if right:
+        _right(d, (SCREEN_WIDTH - 8, 6), right, _font(13, bold=False), DIM)
 
     rows = [sample.cpu, sample.mem]
     if sample.gpu is not None:

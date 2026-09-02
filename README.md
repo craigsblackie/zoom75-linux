@@ -112,6 +112,11 @@ showing a time that had already passed — 35 to 95 seconds stale, drifting in
 and out of phase with the minute. Anything displayed here has to tolerate that
 lag, which load bars and throughput do and a clock does not.
 
+The header shows the hostname and the machine's IPv4 address, read from the
+interface via `SIOCGIFADDR` — not the connect-to-a-public-IP trick, so it asks
+about the exact interface whose throughput is on screen and touches the network
+not at all. It falls back to the interface name if the link has no address.
+
 Sources: `/proc/stat` (CPU), `k10temp`/`coretemp` via hwmon (CPU temp),
 `nvidia-smi` (GPU load, VRAM, temp, power), `/proc/meminfo`, and
 `/sys/class/net/<iface>/statistics` for throughput. The GPU row is dropped
