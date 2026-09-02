@@ -275,6 +275,27 @@ times in a row and watching only the last byte advance.
 > (`0x1001e8fa`). The remaining fifteen are unprobed and at least one more may
 > be destructive. Probe this space deliberately or not at all.
 
+### How the sensor router is actually reached
+
+The firmware is built on a message-passing kernel. At `0x1001fe14` there is a
+table of `(handler, message_id)` pairs:
+
+```
+0x1001fe2c: 0x1000ee45   id 0x0DA2
+0x1001fe34: 0x1000eeb9   id 0x0DA3   <- the 0xA5 sensor router
+0x1001fe3c: 0x1000edc9   id 0x0DA6
+```
+
+So the router at `0x1000eeb8` has **no direct callers** — it is invoked when
+kernel message `0x0DA3` is delivered. That message id appears as an immediate
+in exactly one place, `0x10005f32`, which allocates a 2-byte payload beginning
+`0xA7` — the *other* branch of the router, not the `0xA5` sensor branch.
+
+The BLE receive handler (`0x1001e4a4`) is called directly from `0x1001d094` and
+never allocates a `0x0DA3` message. There is no path from a GATT write to the
+sensor router in this firmware: the two live on opposite sides of a message
+queue that BLE input is never placed on.
+
 ### Why the sensor screens still cannot be driven over BLE
 
 The screen module *does* parse the `0xA5` sensor protocol itself — there is a
