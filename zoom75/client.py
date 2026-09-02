@@ -222,6 +222,34 @@ class Zoom75Screen:
             return (await self.client.read_gatt_char(p.BATTERY_LEVEL_UUID))[0]
         return None
 
+    async def read_clock(self) -> dt.datetime | None:
+        """Read the module's clock back, via the undocumented 0x54 space.
+
+        The 0x88 command space has no clock read-back, so this is the only way
+        to confirm what sync_time() actually set. Replies are not 0x88-framed,
+        so this taps the characteristic directly rather than going through
+        request().
+        """
+        loop = asyncio.get_running_loop()
+        fut: asyncio.Future = loop.create_future()
+
+        def on_raw(_sender, data: bytearray):
+            parsed = p.parse_t_clock(bytes(data))
+            if parsed is not None and not fut.done():
+                fut.set_result(parsed)
+
+        await self.client.stop_notify(p.NOTIFY_UUID)
+        await self.client.start_notify(p.NOTIFY_UUID, on_raw)
+        try:
+            await self.client.write_gatt_char(p.WRITE_UUID, p.cmd_t_get_clock(), response=True)
+            return await asyncio.wait_for(fut, 5.0)
+        except asyncio.TimeoutError:
+            return None
+        finally:
+            with contextlib.suppress(Exception):
+                await self.client.stop_notify(p.NOTIFY_UUID)
+                await self.client.start_notify(p.NOTIFY_UUID, self._on_notify)
+
     async def sync_time(self, when: dt.datetime | None = None, *, english: bool = True) -> dt.datetime:
         """Set the module's real-time clock. Returns the instant that was sent.
 

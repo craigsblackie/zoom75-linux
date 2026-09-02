@@ -494,3 +494,58 @@ def cmd_power_off(mode: int = 1) -> bytes:
 
 def cmd_test_mode() -> bytes:
     return frame(OP_TEST_MODE + b"\x54" + PRIVILEGED_MAGIC)
+
+
+# --- the "T" protocol ------------------------------------------------------
+#
+# The BLE receive handler accepts *two* framings. Alongside the 0x88 frames the
+# vendor phone app uses, it dispatches anything starting with 0x54 ('T') into a
+# second command space that the app never touches:
+#
+#     ldrb r1, [r4]        ; first byte of the received buffer
+#     cmp  r1, #0x54       ; -> second dispatch, 19 sub-commands
+#     beq  ...
+#     cmp  r7, #8          ; the 0x88 path requires >= 8 bytes
+#     cmp  r1, #0x88
+#
+# Frames are bare: 0x54, a sub-command byte, then arguments. No length, no
+# checksum. Replies echo `54 <sub>` and are *not* 0x88-framed, so parse() will
+# not decode them.
+#
+# Confirmed on hardware: sub-command 0x0A reads back the module's real-time
+# clock, which the 0x88 space offers no way to do.
+
+T_MAGIC = 0x54
+T_GET_CLOCK = 0x0A
+
+# DANGER: sub-command 0x01 resets the module. Observed directly -- sending
+# `54 01` dropped the BLE link with a GATT error and cleared the real-time
+# clock back to a 2023-03-03 default, losing a correct 2026-09-02 setting.
+# The other sub-commands (0x02-0x09, 0x40, 0x44-0x46, 0x50, 0x93, 0x97, 0xF0,
+# 0xF1) are unprobed and at least one of them is a setter taking three bytes.
+T_RESET_DANGEROUS = 0x01
+
+
+def cmd_t(sub: int, payload: bytes = b"") -> bytes:
+    return bytes([T_MAGIC, sub & 0xFF]) + payload
+
+
+def cmd_t_get_clock() -> bytes:
+    return cmd_t(T_GET_CLOCK)
+
+
+def parse_t_clock(reply: bytes) -> _dtmod.datetime | None:
+    """Decode a `54 0A` reply.
+
+    Layout: `54 0A <year:u16be> <month> <day> <hour> <minute> <second>`.
+    The seconds field was confirmed by reading three times in a row and
+    watching only the last byte advance.
+    """
+    if len(reply) < 9 or reply[0] != T_MAGIC or reply[1] != T_GET_CLOCK:
+        return None
+    year = struct.unpack(">H", reply[2:4])[0]
+    month, day, hour, minute, second = reply[4], reply[5], reply[6], reply[7], reply[8]
+    try:
+        return _dtmod.datetime(year, month, day, hour, minute, second)
+    except ValueError:
+        return None

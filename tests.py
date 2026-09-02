@@ -201,6 +201,19 @@ eq("loopback address resolves", _iface_ip("lo"), "127.0.0.1")
 eq("unknown interface is None", _iface_ip("definitely-not-a-nic"), None)
 eq("empty interface is None", _iface_ip(""), None)
 
+# --- the undocumented 0x54 ("T") BLE command space --------------------------
+eq("T frame is bare", p.cmd_t_get_clock().hex(), "540a")
+eq("T magic", p.T_MAGIC, 0x54)
+# Real reply captured from hardware at 2026-09-02 09:31:01.
+eq("T clock parse", str(p.parse_t_clock(bytes.fromhex("540a07ea0902091f01"))),
+   "2026-09-02 09:31:01")
+eq("T clock seconds advance",
+   p.parse_t_clock(bytes.fromhex("540a07e70303120312")).second, 18)
+eq("T clock rejects 0x88 frames", p.parse_t_clock(b"\x88\x00\x00"), None)
+eq("T clock rejects short", p.parse_t_clock(bytes.fromhex("540a07ea09")), None)
+eq("T clock rejects bad date", p.parse_t_clock(bytes.fromhex("540affff6363636363")), None)
+eq("reset sub-command is flagged", p.T_RESET_DANGEROUS, 0x01)
+
 print()
 print(f"{'ALL PASS' if not fails else str(len(fails)) + ' FAILURES: ' + ', '.join(fails)}")
 raise SystemExit(1 if fails else 0)

@@ -236,6 +236,65 @@ frame and no visible effect.
 | `0x0702` | generic ack (`01` + request opcode) | **verified** |
 | `0x0803`/`0x0805`/`0x0903`/`0x0907` | dial upload and restore | **verified** |
 
+### A second BLE protocol: 0x54 ("T")
+
+The BLE receive handler accepts **two** framings, not one. Disassembly of the
+screen module's own firmware (load base `0x10000000`) shows the dispatcher at
+`0x1001e4a4`:
+
+```
+1001e4c2  ldrb  r1, [r4]      ; first byte received
+1001e4c4  cmp   r1, #0x54     ; 'T' -> a second command space
+1001e4c6  beq   0x1001e4da
+1001e4c8  cmp   r7, #8        ; the 0x88 path needs >= 8 bytes
+1001e4ca  blo   0x1001e5ae
+1001e4cc  cmp   r1, #0x88     ; the space the phone app uses
+1001e4ce  bne   0x1001e5ae
+```
+
+The `0x54` space is dispatched on the second byte across 19 sub-commands
+(`0x01`-`0x0A`, `0x40`, `0x44`-`0x46`, `0x50`, `0x93`, `0x97`, `0xF0`, `0xF1`)
+and the vendor phone app never uses any of it. Frames are bare — magic,
+sub-command, arguments — with no length field and no checksum. Replies echo
+`54 <sub>` and are **not** `0x88`-framed.
+
+**`0x0A` reads back the real-time clock**, which the `0x88` space cannot do:
+
+```
+-> 54 0a
+<- 54 0a 07ea 09 02 09 1f 01     = 2026-09-02 09:31:01
+      \__ year BE  \_ month, day, hour, minute, second
+```
+
+Exposed as `z75 time --read`. The seconds field was confirmed by reading three
+times in a row and watching only the last byte advance.
+
+> **`54 01` resets the module.** Sending it dropped the BLE link with a GATT
+> error and cleared the real-time clock to a 2023-03-03 default, losing a
+> correct setting. Sub-command `0x50` is a setter reading three argument bytes
+> (`0x1001e8fa`). The remaining fifteen are unprobed and at least one more may
+> be destructive. Probe this space deliberately or not at all.
+
+### Why the sensor screens still cannot be driven over BLE
+
+The screen module *does* parse the `0xA5` sensor protocol itself — there is a
+bounds-checked dispatch table at `0x1000eed4`:
+
+```
+1000eed0  ldrb  r0, [r6]
+1000eed4  cmp   r0, #0xa5
+1000eed6  beq   0x1000eeec       ; -> index a handler table by [r6+1]
+```
+
+But the BLE receive path filters on the first byte for `0x54` or `0x88` only,
+and `0xA5` matches neither. Confirmed empirically: raw `0x1C`-framed HID
+reports written to either BLE characteristic draw **no reply at all**, while
+malformed `0x88` frames still get the generic ack. The `0xA5` dispatcher is fed
+from the keyboard MCU's link, not from BLE.
+
+The one remaining avenue is a `0x54` or `0x88` sub-command that forwards a
+payload into that dispatcher. Fifteen `0x54` sub-commands are unprobed.
+
 ### The two command spaces do not overlap
 
 The module answers on two transports that carry **different, non-overlapping

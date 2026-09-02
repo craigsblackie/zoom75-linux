@@ -65,10 +65,11 @@ async def cmd_info(args):
             print(f"firmware     {(await screen.firmware()).payload.hex()}")
         except Zoom75Error:
             pass
-        try:
-            print(f"system       {(await screen.system_data()).payload.hex()}")
-        except Zoom75Error:
-            pass
+        # system_data() is a query(): it returns None when the device acks but
+        # sends no data frame, which is what this hardware does.
+        sysdata = await screen.system_data()
+        if sysdata is not None:
+            print(f"system       {sysdata.payload.hex()}")
     finally:
         await screen.disconnect()
     return 0
@@ -391,6 +392,22 @@ async def cmd_time(args):
             with contextlib.suppress(Exception):
                 await screen.disconnect()
 
+    if args.read:
+        screen = await _open(args)
+        try:
+            got = await screen.read_clock()
+        finally:
+            with contextlib.suppress(Exception):
+                await screen.disconnect()
+        if got is None:
+            print("no clock read-back")
+            return 1
+        drift = (dt_module.datetime.now() - got).total_seconds()
+        print(f"module clock  {got:%Y-%m-%d %H:%M:%S}")
+        print(f"host clock    {dt_module.datetime.now():%Y-%m-%d %H:%M:%S}")
+        print(f"drift         {drift:+.0f}s")
+        return 0
+
     if not args.watch:
         print(f"module clock set to {await sync_once()}")
         return 0
@@ -516,6 +533,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=cmd_stats)
 
     s = sub.add_parser("time", help="set the module's own clock from this machine")
+    s.add_argument("--read", action="store_true",
+                   help="read the module clock back instead of setting it")
     s.add_argument("--watch", action="store_true",
                    help="keep re-syncing, releasing the connection between runs")
     s.add_argument("--interval", type=float, default=21600.0,

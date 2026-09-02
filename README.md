@@ -147,8 +147,13 @@ WantedBy=default.target
 
 ```
 ./z75 time                              # set the module clock from this machine
+./z75 time --read                       # read it back
 ./z75 time --watch --interval 21600     # re-sync every 6 hours
 ```
+
+The read-back goes through an **undocumented second BLE command space** the
+vendor app never uses — see "A second BLE protocol" in `PROTOCOL.md`. The
+documented `0x88` space has no way to read the clock.
 
 The module has a real-time clock, set with opcode `0x0401` (`YYYY` big-endian,
 month, day, hour, minute, second). The app never sends it alone — every connect
